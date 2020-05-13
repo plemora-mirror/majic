@@ -2,6 +2,16 @@ defmodule GenMagic.Pool do
   @behaviour NimblePool
   @moduledoc "Pool of `GenMagic.Server`"
 
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 500
+    }
+  end
+
   def start_link(options, pool_size \\ nil) do
     pool_size = pool_size || System.schedulers_online()
     NimblePool.start_link(worker: {__MODULE__, options}, pool_size: pool_size)

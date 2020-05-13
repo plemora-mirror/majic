@@ -211,6 +211,7 @@ defmodule GenMagic.Server do
   @doc false
   def available({:call, from}, {:perform, path}, data) do
     data = %{data | cycles: data.cycles + 1, request: {path, from, :erlang.now()}}
+
     send(data.port, {:file, path})
     {:next_state, :processing, data}
   end
