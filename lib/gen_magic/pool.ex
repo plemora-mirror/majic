@@ -10,8 +10,8 @@ defmodule GenMagic.Pool do
     pool_timeout = Keyword.get(opts, :pool_timeout, 5000)
     timeout = Keyword.get(opts, :timeout, 5000)
 
-    NimblePool.checkout!(pool, :checkout, fn _from, server ->
-      {GenMagic.perform(server, path, timeout), server}
+    NimblePool.checkout!(pool, :checkout, fn _, server ->
+      {GenMagic.Server.perform(server, path, timeout), server}
     end, pool_timeout)
   end
 
@@ -22,33 +22,28 @@ defmodule GenMagic.Pool do
       {nil, options} -> {__MODULE__, options}
       {_, options} -> {nil, options}
     end
-    if name, do: Process.register(self(), atom)
+    if name, do: Process.register(self(), name)
     {:ok, options}
   end
 
   @impl NimblePool
   def init_worker(options) do
-    {:ok, server} = GenMagic.Server.start_link(options)
-    {:ok, server, nil}
+    {:ok, server} = GenMagic.Server.start_link(options || [])
+    {:ok, server, options}
   end
 
   @impl NimblePool
-  def handle_checkout(:checkout, _, server, state) do
-    {:ok, server, server, pool_state}
+  def handle_checkout(:checkout, _from, server) do
+    {:ok, server, server}
   end
 
   @impl NimblePool
-  def handle_checkin(server, _from, _old_server, state) do
-    {:ok, server, state}
+  def handle_checkin(_, _, server) do
+    {:ok, server}
   end
 
   @impl NimblePool
   def terminate_worker(_reason, _worker, state) do
-    {:ok, state}
-  end
-
-  @impl NimblePool
-  def terminate(_reason, _conn, state) do
     {:ok, state}
   end
 
