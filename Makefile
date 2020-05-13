@@ -19,7 +19,7 @@ SOURCE_MAGIC = $(TEST_DIRECTORY)/elixir
 
 priv/apprentice: src/apprentice.c
 	mkdir -p priv
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $^ -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 # Test case
 
