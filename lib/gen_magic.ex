@@ -29,11 +29,11 @@ defmodule GenMagic do
     end
   end
 
-  defp do_perform({GenMagic.Helpers, _}, timeout) do
+  defp do_perform({GenMagic.Helpers, _}, path, timeout) do
     GenMagic.Helpers.perform_once(path, timeout)
   end
 
-  defp do_perform({mod, name}, path) do
+  defp do_perform({mod, name}, path, timeout) do
     mod.perform(name, path, tiemout)
   end
 
