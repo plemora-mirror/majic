@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog][1], and this project adheres to [Seman
 - Bytes support: `Majic.Server.perform(ref, {:bytes, <<>>})`
 - Builds on Musl
 - Better error and timeout handling
+- Renamed `priv/apprentice` to `priv/libmagic_port` to be more obvious in `ps`
 
 ## gen_majic [1.0]
 

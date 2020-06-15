@@ -158,8 +158,10 @@ During design and prototype development of this library, the Author has drawn in
 thanks all contributors for their generosity:
 
 - [Evadne Wu](https://github.com/evadne)
-  - Original work
-- Mr [James Every](https://github.com/devstopfix)
+  - Original [gen_magic](https://github.com/evadne/gen_magic) author.
+- [James Every](https://github.com/devstopfix)
   - Enhanced Elixir Wrapper (based on GenServer)
   - Initial Hex packaging (v.0.22)
   - Soak Testing
+- Matthias and Ced for helping the author with C oddities
+- [Hecate](https://github.com/Kleidukos) for laughing at aforementionned oddities
