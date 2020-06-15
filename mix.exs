@@ -1,13 +1,13 @@
-defmodule GenMagic.MixProject do
+defmodule Majic.MixProject do
   use Mix.Project
 
   if :erlang.system_info(:otp_release) < '21' do
-    raise "GenMagic requires Erlang/OTP 21 or newer"
+    raise "Majic requires Erlang/OTP 21 or newer"
   end
 
   def project do
     [
-      app: :gen_magic,
+      app: :majic,
       version: "1.0.0",
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -16,9 +16,9 @@ defmodule GenMagic.MixProject do
       package: package(),
       deps: deps(),
       dialyzer: dialyzer(),
-      name: "GenMagic",
+      name: "Majic",
       description: "File introspection with libmagic",
-      source_url: "https://github.com/evadne/gen_magic",
+      source_url: "https://github.com/hrefhref/majic",
       docs: docs()
     ]
   end

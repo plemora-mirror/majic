@@ -1,4 +1,4 @@
-defmodule GenMagic.Result do
+defmodule Majic.Result do
   @moduledoc """
   Represents the results obtained from libmagic.
 

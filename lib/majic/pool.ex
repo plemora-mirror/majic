@@ -1,6 +1,6 @@
-defmodule GenMagic.Pool do
+defmodule Majic.Pool do
   @behaviour NimblePool
-  @moduledoc "Pool of `GenMagic.Server`"
+  @moduledoc "Pool of `Majic.Server`"
 
   def child_spec(opts) do
     %{
@@ -25,7 +25,7 @@ defmodule GenMagic.Pool do
       pool,
       :checkout,
       fn _, server ->
-        {GenMagic.Server.perform(server, path, timeout), server}
+        {Majic.Server.perform(server, path, timeout), server}
       end,
       pool_timeout
     )
@@ -46,7 +46,7 @@ defmodule GenMagic.Pool do
 
   @impl NimblePool
   def init_worker(options) do
-    {:ok, server} = GenMagic.Server.start_link(options || [])
+    {:ok, server} = Majic.Server.start_link(options || [])
     {:ok, server, options}
   end
 

@@ -1,17 +1,11 @@
-defmodule GenMagic do
-  @moduledoc """
-  Top-level namespace for GenMagic, the libmagic client for Elixir.
-
-  See `GenMagic.Server` or the README for usage.
-  """
-
+defmodule Majic do
   @doc """
   Perform on `path`.
 
   An option of `server: ServerName`, `pool: PoolName` or `once: true` must be passed.
   """
+  @type name :: {:pool, atom()} | {:server, GenMagic.Server.t()} | {:once, true}
   @type option :: name
-    when name: {:pool, atom()} | {:server, GenMagic.Server.t()} | {:once, true}
 
   @spec perform(GenMagic.Server.target(), [option()]) :: GenMagic.Server.result()
   def perform(path, opts, timeout \\ 5000) do
@@ -34,7 +28,7 @@ defmodule GenMagic do
   end
 
   defp do_perform({mod, name}, path, timeout) do
-    mod.perform(name, path, tiemout)
+    mod.perform(name, path, timeout)
   end
 
 end

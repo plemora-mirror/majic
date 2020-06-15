@@ -8,7 +8,7 @@ defmodule Soak do
   def perform_infinite([]), do: false
 
   def perform_infinite(paths) do
-    {:ok, pid} = GenMagic.Server.start_link(database_patterns: ["/usr/local/share/misc/*.mgc"])
+    {:ok, pid} = Majic.Server.start_link(database_patterns: ["/usr/local/share/misc/*.mgc"])
 
     perform_infinite(paths, [], pid, 0)
   end
@@ -19,7 +19,7 @@ defmodule Soak do
 
   defp perform_infinite([path | paths], done, pid, count) do
     if rem(count, 1000) == 0, do: IO.puts(Integer.to_string(count))
-    {:ok, %GenMagic.Result{}} = GenMagic.Server.perform(pid, path)
+    {:ok, %Majic.Result{}} = Majic.Server.perform(pid, path)
     perform_infinite(paths, [path | done], pid, count + 1)
   end
 end

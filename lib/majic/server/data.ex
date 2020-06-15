@@ -1,4 +1,4 @@
-defmodule GenMagic.Server.Data do
+defmodule Majic.Server.Data do
   @moduledoc false
 
   @type request :: {Path.t(), {pid(), term()}, requested_at :: integer()}

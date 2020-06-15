@@ -1,4 +1,4 @@
-defmodule GenMagic.MagicCase do
+defmodule Majic.MagicCase do
   @moduledoc false
   use ExUnit.CaseTemplate
 

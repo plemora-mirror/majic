@@ -1,4 +1,4 @@
-defmodule GenMagic.Server do
+defmodule Majic.Server do
   @moduledoc """
   Provides access to the underlying libmagic client, which performs file introspection.
 
@@ -6,9 +6,9 @@ defmodule GenMagic.Server do
   """
 
   @behaviour :gen_statem
-  alias GenMagic.Result
-  alias GenMagic.Server.Data
-  alias GenMagic.Server.Status
+  alias Majic.Result
+  alias Majic.Server.Data
+  alias Majic.Server.Status
   import Kernel, except: [send: 2]
   require Logger
 
@@ -34,7 +34,7 @@ defmodule GenMagic.Server do
     Can be set to `:infinity`.
 
     Please note that, if you have chosen a custom timeout value, you should also pass it when
-    using `GenMagic.Server.perform/3`.
+    using `Majic.Server.perform/3`.
 
   - `:recycle_threshold`: Specifies the number of requests processed before the underlying C
     program is recycled.
@@ -169,7 +169,7 @@ defmodule GenMagic.Server do
 
   @impl :gen_statem
   def init(options) do
-    import GenMagic.Config
+    import Majic.Config
 
     data = %Data{
       port_name: get_port_name(),

@@ -1,5 +1,3 @@
-# Apprentice binary
-
 ERL_EI_INCLUDE:=$(shell  erl -eval 'io:format("~s", [code:lib_dir(erl_interface, include)])' -s init stop -noshell | head -1)
 ERL_EI_LIB:=$(shell  erl -eval 'io:format("~s", [code:lib_dir(erl_interface, lib)])' -s init stop -noshell | head -1)
 CFLAGS = -std=c99 -g -Wall -Werror
@@ -9,9 +7,9 @@ LDLIBS = -lpthread -lei -lm -lmagic
 PRIV = priv/
 RM = rm -Rf
 
-all: priv/apprentice
+all: priv/libmagic_port
 
-priv/apprentice: src/apprentice.c
+priv/libmagic_port: src/libmagic_port.c
 	mkdir -p priv
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
 

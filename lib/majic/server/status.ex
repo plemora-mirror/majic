@@ -1,4 +1,4 @@
-defmodule GenMagic.Server.Status do
+defmodule Majic.Server.Status do
   @moduledoc """
   Represents Status of the underlying Server.
   """
@@ -12,7 +12,7 @@ defmodule GenMagic.Server.Status do
     recycling is enabled.
   """
   @type t :: %__MODULE__{
-          state: GenMagic.Server.state(),
+          state: Majic.Server.state(),
           cycles: non_neg_integer()
         }
 

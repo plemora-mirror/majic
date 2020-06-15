@@ -1,17 +1,17 @@
-defmodule GenMagic.ApprenticeTest do
-  use GenMagic.MagicCase
+defmodule Majic.ApprenticeTest do
+  use Majic.MagicCase
 
   @tmp_path "/tmp/testgenmagicx"
   require Logger
 
   test "sends ready" do
-    port = Port.open(GenMagic.Config.get_port_name(), GenMagic.Config.get_port_options([]))
+    port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
     on_exit(fn -> send(port, {self(), :close}) end)
     assert_ready_and_init_default(port)
   end
 
   test "stops" do
-    port = Port.open(GenMagic.Config.get_port_name(), GenMagic.Config.get_port_options([]))
+    port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
     on_exit(fn -> send(port, {self(), :close}) end)
     assert_ready_and_init_default(port)
     send(port, {self(), {:command, :erlang.term_to_binary({:stop, :stop})}})
@@ -20,7 +20,7 @@ defmodule GenMagic.ApprenticeTest do
 
   test "exits with non existent database with an error" do
     opts = [:use_stdio, :binary, :exit_status, {:packet, 2}, {:args, []}]
-    port = Port.open(GenMagic.Config.get_port_name(), opts)
+    port = Port.open(Majic.Config.get_port_name(), opts)
     on_exit(fn -> send(port, {self(), :close}) end)
     assert_ready(port)
 
@@ -34,7 +34,7 @@ defmodule GenMagic.ApprenticeTest do
 
   describe "port" do
     setup do
-      port = Port.open(GenMagic.Config.get_port_name(), GenMagic.Config.get_port_options([]))
+      port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
       on_exit(fn -> send(port, {self(), :close}) end)
       assert_ready_and_init_default(port)
       %{port: port}

@@ -1,7 +1,7 @@
-defmodule GenMagic.Config do
+defmodule Majic.Config do
   @moduledoc false
   @otp_app Mix.Project.config()[:app]
-  @executable_name "apprentice"
+  @executable_name "libmagic_port"
   @startup_timeout 1_000
   @process_timeout 30_000
   @recycle_threshold :infinity
