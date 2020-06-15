@@ -27,7 +27,7 @@ Depending on the use case, you may utilise a single (one-off) GenMagic process w
 To use GenMagic directly, you can use `GenMagic.Helpers.perform_once/1`:
 
 ```elixir
-iex(1)> GenMagic.Helpers.perform_once "."
+iex(1)> GenMagic.perform(".", once: true)
 {:ok,
  %GenMagic.Result{
    content: "directory",
@@ -40,7 +40,7 @@ To use the GenMagic server as a daemon, you can start it first, keep a reference
 
 ```elixir
 {:ok, pid} = GenMagic.Server.start_link([])
-{:ok, result} = GenMagic.Server.perform(pid, path)
+{:ok, result} = GenMagic.perform(path, server: pid)
 ```
 
 See `GenMagic.Server.start_link/1` and `t:GenMagic.Server.option/0` for more information on startup parameters.
@@ -67,7 +67,7 @@ See `t:GenMagic.Server.option/0` for details.
 For ad-hoc requests, you can use the helper method `GenMagic.Helpers.perform_once/2`:
 
 ```elixir
-iex(1)> GenMagic.Helpers.perform_once(Path.join(File.cwd!(), "Makefile"))
+iex(1)> GenMagic.perform(Path.join(File.cwd!(), "Makefile"), once: true)
 {:ok,
  %GenMagic.Result{
    content: "makefile script, ASCII text",
@@ -90,8 +90,8 @@ iex(1)> {:ok, pid} = Supervisor.start_link([{GenMagic.Server, name: :gen_magic}]
 Now we can ask it to inspect a file:
 
 ```elixir
-iex(2)> GenMagic.Server.perform(:gen_magic, Path.expand("~/.bash_history"))
-{:ok, [mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"]}
+iex(2)> GenMagic.perform(Path.expand("~/.bash_history"), server: :gen_magic)
+{:ok, %GenMagic.Result{mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"}}
 ```
 
 Note that in this case we have opted to use a named process.
@@ -114,11 +114,11 @@ You can add a pool in your application supervisor by adding it as a child:
     Supervisor.start_link(children, opts)
 ```
 
-And then you can use it with `GenMagic.Pool.perform/2`:
+And then you can use it with `GenMagic.perform/2` with `pool: YourApp.GenMagicPool` option:
 
 ```
-iex(1)> GenMagic.Pool.perform(YourApp.GenMagicPool, Path.expand("~/.bash_history"))
-{:ok, [mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"]}
+iex(1)> GenMagic.perform(Path.expand("~/.bash_history"), pool: YourApp.GenMagicPool)
+{:ok, %GenMagic.Result{mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"}}
 ```
 
 ### Check Uploaded Files
@@ -127,7 +127,7 @@ If you use Phoenix, you can inspect the file from your controller:
 
 ```elixir
 def upload(conn, %{"upload" => %{path: path}}) do,
-  {:ok, result} = GenMagic.Helpers.perform_once(:gen_magic, path)
+  {:ok, result} = GenMagic.perform(path, server: :gen_magic)
   text(conn, "Received your file containing #{result.content}")
 end
 ```

@@ -55,6 +55,9 @@ defmodule GenMagic.Server do
           | {:recycle_threshold, non_neg_integer() | :infinity}
           | {:database_patterns, nonempty_list(:default | Path.t())}
 
+  @type target :: Path.t() | {:bytes, binary()}
+  @type result :: {:ok, Result.t()} | {:error, term() | String.t()}
+
   @typedoc """
   Current state of the Server:
 
@@ -81,8 +84,7 @@ defmodule GenMagic.Server do
 
   @spec child_spec([option()]) :: Supervisor.child_spec()
   @spec start_link([option()]) :: :gen_statem.start_ret()
-  @spec perform(t(), Path.t() | {:bytes, binary()}, timeout()) ::
-          {:ok, Result.t()} | {:error, term() | String.t()}
+  @spec perform(t(), target(), timeout()) :: result()
   @spec status(t(), timeout()) :: {:ok, Status.t()} | {:error, term()}
   @spec stop(t(), term(), timeout()) :: :ok
 
