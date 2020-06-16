@@ -63,11 +63,9 @@ if Code.ensure_loaded?(Plug) do
     defp collect_upload({k, %{__struct__: Plug.Upload, path: path} = upload}, acc, opts) do
       case Majic.perform(path, opts) do
         {:ok, magic} ->
-          IO.puts("Fixed upload -- #{inspect {upload,magic,opts}}")
           Map.put(acc, k, fix_upload(upload, magic, opts))
 
         {:error, error} ->
-          IO.puts("UPLOAD GOT BADARG")
           raise(Majic.PlugError, "Failed to gen_magic: #{inspect(error)}")
       end
     end
