@@ -63,22 +63,20 @@ defmodule Majic.PlugTest do
     assert conn.state == :sent
     assert conn.status == 200
 
-    refute get_in(conn.body_params, ["form", "makefile"]).content_type ==
-             get_in(conn.params, ["form", "makefile"]).content_type
+    assert get_in(conn.body_params, ["form", "makefile"]) ==
+             get_in(conn.params, ["form", "makefile"])
 
     assert get_in(conn.params, ["form", "makefile"]).content_type == "text/x-makefile"
     assert get_in(conn.params, ["form", "makefile"]).filename == "mymakefile"
     assert get_in(conn_no_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
     assert get_in(conn_append_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
 
-    refute get_in(conn.body_params, ["form", "make", "file"]).content_type ==
-             get_in(conn.params, ["form", "make", "file"]).content_type
+    assert get_in(conn.body_params, ["form", "make", "file"]) ==
+             get_in(conn.params, ["form", "make", "file"])
 
     assert get_in(conn.params, ["form", "make", "file"]).content_type == "text/x-makefile"
 
-    refute get_in(conn.body_params, ["cat"]).content_type ==
-             get_in(conn.params, ["cat"]).content_type
-
+    assert get_in(conn.body_params, ["cat"]) == get_in(conn.params, ["cat"])
     assert get_in(conn.params, ["cat"]).content_type == "image/webp"
     assert get_in(conn.params, ["cat"]).filename == "cute-cat.webp"
     assert get_in(conn_no_ext.params, ["cat"]).filename == "cute-cat.jpg"

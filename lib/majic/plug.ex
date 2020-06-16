@@ -42,40 +42,59 @@ if Code.ensure_loaded?(Plug) do
         true -> raise(Majic.PlugError, "No server/pool/once option defined")
       end
 
+      opts =
+        opts
+        |> Keyword.put_new(:fix_extension, true)
+        |> Keyword.put_new(:append_extension, false)
+
       opts
-      |> Keyword.put_new(:fix_extension, true)
-      |> Keyword.put_new(:append_extension, false)
     end
 
     @impl Plug
-    def call(%{params: params} = conn, opts) do
-      %{conn | params: collect_uploads(params, opts)}
+    def call(conn, opts) do
+      collected = collect_uploads([], conn.body_params, [])
+
+      Enum.reduce(collected, conn, fn {param_path, upload}, conn ->
+        param_path = Enum.reverse(param_path)
+
+        upload =
+          case Majic.perform(upload.path, opts) do
+            {:ok, magic} -> fix_upload(upload, magic, opts)
+            {:error, error} -> raise(Majic.PlugError, "Failed to majic: #{inspect(error)}")
+          end
+
+        conn =
+          if get_in(conn.params, param_path) do
+            %{conn | params: put_in(conn.params, param_path, upload)}
+          end
+
+        if get_in(conn.body_params, param_path) do
+          %{conn | body_params: put_in(conn.body_params, param_path, upload)}
+        end
+      end)
     end
 
-    def call(conn, _) do
-      conn
+    defp collect_uploads(path, params, acc) do
+      Enum.reduce(params, acc, fn value, acc -> collect_upload(path, value, acc) end)
     end
 
-    defp collect_uploads(params, opts) do
-      Enum.reduce(params, Map.new(), fn value, acc -> collect_upload(value, acc, opts) end)
+    # An upload!
+    defp collect_upload(path, {k, %{__struct__: Plug.Upload} = upload}, acc) do
+      [{[k | path], upload} | acc]
     end
 
-    defp collect_upload({k, %{__struct__: Plug.Upload, path: path} = upload}, acc, opts) do
-      case Majic.perform(path, opts) do
-        {:ok, magic} ->
-          Map.put(acc, k, fix_upload(upload, magic, opts))
-
-        {:error, error} ->
-          raise(Majic.PlugError, "Failed to gen_magic: #{inspect(error)}")
-      end
+    # Ignore structs.
+    defp collect_upload(_path, {_, %{__struct__: _}}, acc) do
+      acc
     end
 
-    defp collect_upload({k, v}, acc, opts) when is_map(v) do
-      Map.put(acc, k, collect_uploads(v, opts))
+    # Nested map.
+    defp collect_upload(path, {k, v}, acc) when is_map(v) do
+      collect_uploads([k | path], v, acc)
     end
 
-    defp collect_upload({k, v}, acc, _opts) do
-      Map.put(acc, k, v)
+    defp collect_upload(_path, _, acc) do
+      acc
     end
 
     defp fix_upload(upload, magic, opts) do
@@ -114,7 +133,16 @@ if Code.ensure_loaded?(Plug) do
 
     # No extension for type.
     defp rewrite_extension(upload, old, [], opts) do
-      %{upload | filename: rewrite_or_append_extension(Path.basename(upload.filename, old), old, nil, Keyword.get(opts, :append_extension))}
+      %{
+        upload
+        | filename:
+            rewrite_or_append_extension(
+              Path.basename(upload.filename, old),
+              old,
+              nil,
+              Keyword.get(opts, :append_extension)
+            )
+      }
     end
 
     # Append, no extension for type: keep old extension
