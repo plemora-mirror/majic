@@ -304,7 +304,7 @@ defmodule Majic.Server do
       case path do
         path when is_binary(path) -> {:file, path}
         # Truncate to 50 bytes
-        {:bytes, <<bytes::size(50), _::binary>>} -> {:bytes, bytes}
+        {:bytes, <<bytes::binary-size(50), _::binary>>} -> {:bytes, bytes}
         {:bytes, bytes} -> {:bytes, bytes}
       end
 

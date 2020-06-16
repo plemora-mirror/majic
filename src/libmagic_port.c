@@ -180,7 +180,7 @@ int process_command(uint16_t len, byte *buf) {
       char bytes[51];
       EI_ENSURE(ei_get_type(buf, &index, &termtype, &termsize));
 
-      if (termtype == ERL_BINARY_EXT && termsize < 50) {
+      if (termtype == ERL_BINARY_EXT && termsize < 51) {
         long bin_length;
         EI_ENSURE(ei_decode_binary(buf, &index, bytes, &bin_length));
         bytes[termsize] = '\0';

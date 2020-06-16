@@ -35,6 +35,12 @@ defmodule MajicTest do
     assert_no_file(Majic.Server.perform(pid, path))
   end
 
+  test "Bytes" do
+    {:ok, pid} = Majic.Server.start_link([])
+    bytes = File.read!("test/fixtures/cat.webp")
+    assert {:ok, _} = Majic.Server.perform(pid, {:bytes, bytes})
+  end
+
   test "Named process" do
     {:ok, pid} = Majic.Server.start_link(name: :gen_magic)
     path = absolute_path("Makefile")
