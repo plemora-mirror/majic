@@ -33,27 +33,32 @@ defmodule Majic.PlugTest do
     Content-Disposition: form-data; name=\"form[makefile]\"; filename*=\"utf-8''mymakefile.txt\"\r
     Content-Type: text/plain\r
     \r
-    #{String.replace(File.read!("Makefile"), "\n", "\n")}\r
+    #{File.read!("Makefile")}\r
     ------w58EW1cEpjzydSCq\r
     Content-Disposition: form-data; name=\"form[make][file]\"; filename*=\"utf-8''mymakefile.txt\"\r
     Content-Type: text/plain\r
     \r
-    #{String.replace(File.read!("Makefile"), "\n", "\n")}\r
+    #{File.read!("Makefile")}\r
     ------w58EW1cEpjzydSCq\r
     Content-Disposition: form-data; name=\"cat\"; filename*=\"utf-8''cute-cat.jpg\"\r
     Content-Type: image/jpg\r
     \r
-    #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
+    #{File.read!("test/fixtures/cat.webp")}\r
     ------w58EW1cEpjzydSCq\r
     Content-Disposition: form-data; name=\"cats[]\"; filename*=\"utf-8''first-cute-cat.jpg\"\r
     Content-Type: image/jpg\r
     \r
-    #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
+    #{File.read!("test/fixtures/cat.webp")}\r
+    ------w58EW1cEpjzydSCq\r
+    Content-Disposition: form-data; name=\"cats[]\"\r
+    \r
+    hello i am annoying
+    \r
     ------w58EW1cEpjzydSCq\r
     Content-Disposition: form-data; name=\"cats[]\"; filename*=\"utf-8''second-cute-cat.jpg\"\r
     Content-Type: image/jpg\r
     \r
-    #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
+    #{File.read!("test/fixtures/cat.webp")}\r
     ------w58EW1cEpjzydSCq--\r
     """
 
@@ -92,6 +97,9 @@ defmodule Majic.PlugTest do
     assert get_in(conn_no_ext.params, ["cat"]).filename == "cute-cat.jpg"
     assert get_in(conn_append_ext.params, ["cat"]).filename == "cute-cat.jpg.webp"
 
-    assert Enum.all?(conn.params["cats"], fn upload -> upload.content_type == "image/webp" end)
+    assert Enum.all?(conn.params["cats"], fn
+      %Plug.Upload{} = upload -> upload.content_type == "image/webp"
+      _ -> true
+    end)
   end
 end
