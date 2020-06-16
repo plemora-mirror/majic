@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog][1], and this project adheres to [Seman
 
 - Forked gen_magic.
 - Pool: `Majic.Pool`
+- Plug: `Majic.Plug`
 - Unified API: `Majic.perform/1,2,3`
 
 ## Changed

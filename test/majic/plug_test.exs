@@ -5,12 +5,15 @@ defmodule Majic.PlugTest do
   defmodule TestRouter do
     use Plug.Router
 
-    plug :match
-    plug :dispatch
-    plug Plug.Parsers,
+    plug(:match)
+    plug(:dispatch)
+
+    plug(Plug.Parsers,
       parsers: [:urlencoded, :multipart],
       pass: ["*/*"]
-    #plug Majic.Plug, once: true
+    )
+
+    # plug Majic.Plug, once: true
 
     post "/" do
       send_resp(conn, 200, "Ok")
@@ -44,13 +47,14 @@ defmodule Majic.PlugTest do
     ------w58EW1cEpjzydSCq--\r
     """
 
-    orig_conn = conn(:post, "/", multipart)
-           |> put_req_header("content-type", "multipart/mixed; boundary=----w58EW1cEpjzydSCq")
-           |> TestRouter.call(@router_opts)
+    orig_conn =
+      conn(:post, "/", multipart)
+      |> put_req_header("content-type", "multipart/mixed; boundary=----w58EW1cEpjzydSCq")
+      |> TestRouter.call(@router_opts)
 
-    plug = Majic.Plug.init([once: true])
-    plug_no_ext = Majic.Plug.init([once: true, fix_extension: false])
-    plug_append_ext = Majic.Plug.init([once: true, fix_extension: true, append_extension: true])
+    plug = Majic.Plug.init(once: true)
+    plug_no_ext = Majic.Plug.init(once: true, fix_extension: false)
+    plug_append_ext = Majic.Plug.init(once: true, fix_extension: true, append_extension: true)
 
     conn = Majic.Plug.call(orig_conn, plug)
     conn_no_ext = Majic.Plug.call(orig_conn, plug_no_ext)
@@ -58,15 +62,23 @@ defmodule Majic.PlugTest do
 
     assert conn.state == :sent
     assert conn.status == 200
-    refute get_in(conn.body_params, ["form", "makefile"]).content_type == get_in(conn.params, ["form", "makefile"]).content_type
+
+    refute get_in(conn.body_params, ["form", "makefile"]).content_type ==
+             get_in(conn.params, ["form", "makefile"]).content_type
+
     assert get_in(conn.params, ["form", "makefile"]).content_type == "text/x-makefile"
-    refute get_in(conn.body_params, ["form", "make", "file"]).content_type == get_in(conn.params, ["form", "make", "file"]).content_type
+
+    refute get_in(conn.body_params, ["form", "make", "file"]).content_type ==
+             get_in(conn.params, ["form", "make", "file"]).content_type
+
     assert get_in(conn.params, ["form", "make", "file"]).content_type == "text/x-makefile"
-    refute get_in(conn.body_params, ["cat"]).content_type == get_in(conn.params, ["cat"]).content_type
+
+    refute get_in(conn.body_params, ["cat"]).content_type ==
+             get_in(conn.params, ["cat"]).content_type
+
     assert get_in(conn.params, ["cat"]).content_type == "image/webp"
     assert get_in(conn.params, ["cat"]).filename == "cute-cat.webp"
     assert get_in(conn_no_ext.params, ["cat"]).filename == "cute-cat.jpg"
     assert get_in(conn_append_ext.params, ["cat"]).filename == "cute-cat.jpg.webp"
   end
-
 end
