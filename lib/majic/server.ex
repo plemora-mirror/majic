@@ -256,8 +256,8 @@ defmodule Majic.Server do
   def loading(:state_timeout, :load, {[database | _databases], data} = state) do
     command =
       case database do
-        :default -> {:add_default_database, nil}
-        path -> {:add_database, path}
+        :default -> {:add_database, :default}
+        path when is_binary(path) -> {:add_database, path}
       end
 
     send(data.port, command)

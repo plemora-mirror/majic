@@ -33,7 +33,7 @@ defmodule Majic.PortTest do
 
     send(
       port,
-      {self(), {:command, :erlang.term_to_binary({:add_default_database, nil})}}
+      {self(), {:command, :erlang.term_to_binary({:add_database, :default})}}
     )
 
     assert_receive {^port, {:data, data}}
@@ -180,7 +180,7 @@ defmodule Majic.PortTest do
   def assert_ready_and_init_default(port) do
     assert_receive {^port, {:data, data}}
     assert :ready == :erlang.binary_to_term(data)
-    send(port, {self(), {:command, :erlang.term_to_binary({:add_default_database, nil})}})
+    send(port, {self(), {:command, :erlang.term_to_binary({:add_database, :default})}})
     assert_receive {^port, {:data, data}}
     assert {:ok, _} = :erlang.binary_to_term(data)
   end

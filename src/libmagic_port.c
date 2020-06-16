@@ -15,8 +15,7 @@
 // Once the program is ready, it sends the `:ready` atom.
 //
 // It is then up to the Erlang side to load databases, by sending messages:
-// - `{:add_database, path}`
-// - `{:add_default_database, _}`
+// - `{:add_database, :default | path}`
 //
 // If the requested database have been loaded, an `{:ok, :loaded}` message will
 // follow. Otherwise, the process will exit (exit code 1).
@@ -36,8 +35,7 @@
 //
 // Commands:
 // {:reload, _} :: :ready
-// {:add_database, String.t()} :: {:ok, _} | {:error, _}
-// {:add_default_database, _} :: {:ok, _} | {:error, _}
+// {:add_database, :default | String.t()} :: {:ok, _} | {:error, _}
 // {:file, path :: String.t()} :: {:ok, {type, encoding, name}} | {:error,
 // :badarg} | {:error, {errno :: integer(), String.t()}}
 // {:bytes, binary()} :: same as :file
@@ -85,9 +83,14 @@ void setup_environment();
 void magic_close_all();
 void magic_open_all();
 int magic_load_all(char *path);
-int process_command(uint16_t len, byte *buf);
+void process_command(uint16_t len, byte *buf);
+void process_command_file(byte *buf, int index, ei_x_buff *result);
+void process_command_bytes(byte *buf, int index, ei_x_buff *result);
+void process_command_load(byte *buf, int index, ei_x_buff *result);
 void process_file(char *path, ei_x_buff *result);
 void process_bytes(char *bytes, int size, ei_x_buff *result);
+void process_load(ei_x_buff *result, char *path);
+void send_and_free(ei_x_buff *result);
 size_t read_cmd(byte *buf);
 size_t write_cmd(byte *buf, size_t len);
 void error(ei_x_buff *result, const char *error);
@@ -114,137 +117,128 @@ int main(int argc, char **argv) {
   return 255;
 }
 
-int process_command(uint16_t len, byte *buf) {
+void process_command(uint16_t len, byte *buf) {
   ei_x_buff result;
   char atom[128];
-  int index, version, arity, termtype, termsize;
+  int index, version, arity;
   index = 0;
 
   // Initialize result
   EI_ENSURE(ei_x_new_with_version(&result));
   EI_ENSURE(ei_x_encode_tuple_header(&result, 2));
 
-  if (len >= COMMAND_LEN) {
-    error(&result, "badarg");
-    return 1;
-  }
+  if (len >= COMMAND_LEN)
+    return error(&result, "badarg");
 
-  if (ei_decode_version(buf, &index, &version) != 0) {
+  if (ei_decode_version(buf, &index, &version) != 0)
     exit(ERROR_BAD_TERM);
-  }
 
-  if (ei_decode_tuple_header(buf, &index, &arity) != 0) {
-    error(&result, "badarg");
-    return 1;
-  }
+  if (ei_decode_tuple_header(buf, &index, &arity) != 0)
+    return error(&result, "badarg");
 
-  if (arity != 2) {
-    error(&result, "badarg");
-    return 1;
-  }
+  if (arity != 2)
+    return error(&result, "badarg");
 
-  if (ei_decode_atom(buf, &index, atom) != 0) {
-    error(&result, "badarg");
-    return 1;
-  }
+  if (ei_decode_atom(buf, &index, atom) != 0)
+    return error(&result, "badarg");
 
   // {:file, path}
-  if (strlen(atom) == 4 && strncmp(atom, "file", 4) == 0) {
-    if (magic_loaded) {
-      char path[4097];
-      ei_get_type(buf, &index, &termtype, &termsize);
+  if (strlen(atom) == 4 && strcmp(atom, "file") == 0)
+    return process_command_file(buf, index, &result);
 
-      if (termtype == ERL_BINARY_EXT) {
-        if (termsize < 4096) {
-          long bin_length;
-          EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
-          path[termsize] = '\0';
-          process_file(path, &result);
-        } else {
-          error(&result, "enametoolong");
-          return 1;
-        }
-      } else {
-        error(&result, "badarg");
-        return 1;
-      }
-    } else {
-      error(&result, "magic_database_not_loaded");
-      return 1;
-    }
-    // {:bytes, bytes}
-  } else if (strlen(atom) == 5 && strncmp(atom, "bytes", 5) == 0) {
-    if (magic_loaded) {
-      int termtype;
-      int termsize;
-      char bytes[51];
-      EI_ENSURE(ei_get_type(buf, &index, &termtype, &termsize));
+  // {:bytes, bytes}
+  if (strlen(atom) == 5 && strcmp(atom, "bytes") == 0)
+    return process_command_bytes(buf, index, &result);
 
-      if (termtype == ERL_BINARY_EXT && termsize < 51) {
-        long bin_length;
-        EI_ENSURE(ei_decode_binary(buf, &index, bytes, &bin_length));
-        bytes[termsize] = '\0';
-        process_bytes(bytes, termsize, &result);
-      } else {
-        error(&result, "badarg");
-        return 1;
-      }
-    } else {
-      error(&result, "magic_database_not_loaded");
-      return 1;
-    }
-    // {:add_database, path}
-  } else if (strlen(atom) == 12 && strncmp(atom, "add_database", 12) == 0) {
-    char path[4097];
-    ei_get_type(buf, &index, &termtype, &termsize);
+  // {:add_database, path}
+  if (strlen(atom) == 12 && strcmp(atom, "add_database") == 0)
+    return process_command_load(buf, index, &result);
 
-    if (termtype == ERL_BINARY_EXT) {
-      if (termsize < 4096) {
-        long bin_length;
-        EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
-        path[termsize] = '\0';
-        if (magic_load_all(path) == 0) {
-          EI_ENSURE(ei_x_encode_atom(&result, "ok"));
-          EI_ENSURE(ei_x_encode_atom(&result, "loaded"));
-        } else {
-          EI_ENSURE(ei_x_encode_atom(&result, "error"));
-          EI_ENSURE(ei_x_encode_atom(&result, "not_loaded"));
-        }
-      } else {
-        error(&result, "enametoolong");
-        return 1;
-      }
-    } else {
-      error(&result, "badarg");
-      return 1;
-    }
-    // {:add_default_database, _}
-  } else if (strlen(atom) == 20 &&
-             strncmp(atom, "add_default_database", 20) == 0) {
-    if (magic_load_all(NULL) == 0) {
-      EI_ENSURE(ei_x_encode_atom(&result, "ok"));
-      EI_ENSURE(ei_x_encode_atom(&result, "loaded"));
-    } else {
-      EI_ENSURE(ei_x_encode_atom(&result, "error"));
-      EI_ENSURE(ei_x_encode_atom(&result, "not_loaded"));
-    }
-    // {:reload, _}
-  } else if (strlen(atom) == 6 && strncmp(atom, "reload", 6) == 0) {
-    magic_open_all();
-    return 0;
+  // {:reload, _}
+  if (strlen(atom) == 6 && strcmp(atom, "reload") == 0)
+    return magic_open_all();
+
   // {:stop, _}
-  } else if (strlen(atom) == 4 && strncmp(atom, "stop", 4) == 0) {
+  if (strlen(atom) == 4 && strcmp(atom, "stop") == 0)
     exit(ERROR_OK);
-  // badarg
-  } else {
-    error(&result, "badarg");
-    return 1;
+
+  error(&result, "badarg");
+}
+
+void process_command_file(byte *buf, int index, ei_x_buff *result) {
+  int termtype, termsize;
+  char path[4097];
+  long bin_length;
+
+  if (!magic_loaded)
+    return error(result, "magic_database_not_loaded");
+
+  ei_get_type(buf, &index, &termtype, &termsize);
+
+  if (termtype != ERL_BINARY_EXT)
+    return error(result, "badarg");
+
+  if (termsize > 4096)
+    return error(result, "enametoolong");
+
+  EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
+  path[termsize] = '\0';
+  process_file(path, result);
+}
+
+void process_command_bytes(byte *buf, int index, ei_x_buff *result) {
+  if (!magic_loaded)
+    return error(result, "magic_database_not_loaded");
+
+  int termtype, termsize;
+  long bin_length;
+  char bytes[51];
+  EI_ENSURE(ei_get_type(buf, &index, &termtype, &termsize));
+
+  if (termtype != ERL_BINARY_EXT)
+    return error(result, "badarg");
+
+  if (termsize > 50)
+    return error(result, "toolong");
+
+  EI_ENSURE(ei_decode_binary(buf, &index, bytes, &bin_length));
+  bytes[termsize] = '\0';
+  process_bytes(bytes, termsize, result);
+}
+
+void process_command_load(byte *buf, int index, ei_x_buff *result) {
+  char path[4097];
+  int termtype, termsize;
+  ei_get_type(buf, &index, &termtype, &termsize);
+
+  if (termtype == ERL_BINARY_EXT) {
+    if (termsize > 4096)
+      return error(result, "enametoolong");
+
+    long bin_length;
+    EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
+    path[termsize] = '\0';
+    return process_load(result, path);
   }
 
-  write_cmd(result.buff, result.index);
+  if (termtype == ERL_ATOM_EXT) {
+    EI_ENSURE(ei_decode_atom(buf, &index, path));
+    if (strlen(path) == 7 && strcmp(path, "default") == 0)
+      return process_load(result, NULL);
+  }
 
-  EI_ENSURE(ei_x_free(&result));
-  return 0;
+  error(result, "badarg");
+}
+
+void process_load(ei_x_buff *result, char *path) {
+  if (magic_load_all(path) == 0) {
+    EI_ENSURE(ei_x_encode_atom(result, "ok"));
+    EI_ENSURE(ei_x_encode_atom(result, "loaded"));
+  } else {
+    EI_ENSURE(ei_x_encode_atom(result, "error"));
+    EI_ENSURE(ei_x_encode_atom(result, "not_loaded"));
+  }
+  send_and_free(result);
 }
 
 void setup_environment() { opterr = 0; }
@@ -275,25 +269,22 @@ void magic_open_all() {
     ei_x_buff ok_buf;
     EI_ENSURE(ei_x_new_with_version(&ok_buf));
     EI_ENSURE(ei_x_encode_atom(&ok_buf, "ready"));
-    write_cmd(ok_buf.buff, ok_buf.index);
-    EI_ENSURE(ei_x_free(&ok_buf));
-  } else {
-    exit(ERROR_MAGIC);
+    return send_and_free(&ok_buf);
   }
+
+  exit(ERROR_MAGIC);
 }
 
 int magic_load_all(char *path) {
   int res;
 
-  if ((res = magic_load(magic_mime_encoding, path)) != 0) {
+  if ((res = magic_load(magic_mime_encoding, path)) != 0)
     return res;
-  }
-  if ((res = magic_load(magic_mime_type, path)) != 0) {
+  if ((res = magic_load(magic_mime_type, path)) != 0)
     return res;
-  }
-  if ((res = magic_load(magic_type_name, path)) != 0) {
+  if ((res = magic_load(magic_type_name, path)) != 0)
     return res;
-  }
+
   magic_loaded = true;
   return 0;
 }
@@ -302,27 +293,21 @@ void process_bytes(char *path, int size, ei_x_buff *result) {
   const char *mime_type_result = magic_buffer(magic_mime_type, path, size);
   const int mime_type_errno = magic_errno(magic_mime_type);
 
-  if (mime_type_errno > 0) {
-    handle_magic_error(magic_mime_type, mime_type_errno, result);
-    return;
-  }
+  if (mime_type_errno > 0)
+    return handle_magic_error(magic_mime_type, mime_type_errno, result);
 
   const char *mime_encoding_result =
       magic_buffer(magic_mime_encoding, path, size);
   int mime_encoding_errno = magic_errno(magic_mime_encoding);
 
-  if (mime_encoding_errno > 0) {
-    handle_magic_error(magic_mime_encoding, mime_encoding_errno, result);
-    return;
-  }
+  if (mime_encoding_errno > 0)
+    return handle_magic_error(magic_mime_encoding, mime_encoding_errno, result);
 
   const char *type_name_result = magic_buffer(magic_type_name, path, size);
   int type_name_errno = magic_errno(magic_type_name);
 
-  if (type_name_errno > 0) {
-    handle_magic_error(magic_type_name, type_name_errno, result);
-    return;
-  }
+  if (type_name_errno > 0)
+    return handle_magic_error(magic_type_name, type_name_errno, result);
 
   EI_ENSURE(ei_x_encode_atom(result, "ok"));
   EI_ENSURE(ei_x_encode_tuple_header(result, 3));
@@ -332,7 +317,7 @@ void process_bytes(char *path, int size, ei_x_buff *result) {
                                strlen(mime_encoding_result)));
   EI_ENSURE(
       ei_x_encode_binary(result, type_name_result, strlen(type_name_result)));
-  return;
+  send_and_free(result);
 }
 
 void handle_magic_error(magic_t handle, int errn, ei_x_buff *result) {
@@ -342,33 +327,27 @@ void handle_magic_error(magic_t handle, int errn, ei_x_buff *result) {
   long errlon = (long)errn;
   EI_ENSURE(ei_x_encode_long(result, errlon));
   EI_ENSURE(ei_x_encode_binary(result, error, strlen(error)));
-  return;
+  send_and_free(result);
 }
 
 void process_file(char *path, ei_x_buff *result) {
   const char *mime_type_result = magic_file(magic_mime_type, path);
   const int mime_type_errno = magic_errno(magic_mime_type);
 
-  if (mime_type_errno > 0) {
-    handle_magic_error(magic_mime_type, mime_type_errno, result);
-    return;
-  }
+  if (mime_type_errno > 0)
+    return handle_magic_error(magic_mime_type, mime_type_errno, result);
 
   const char *mime_encoding_result = magic_file(magic_mime_encoding, path);
   int mime_encoding_errno = magic_errno(magic_mime_encoding);
 
-  if (mime_encoding_errno > 0) {
-    handle_magic_error(magic_mime_encoding, mime_encoding_errno, result);
-    return;
-  }
+  if (mime_encoding_errno > 0)
+    return handle_magic_error(magic_mime_encoding, mime_encoding_errno, result);
 
   const char *type_name_result = magic_file(magic_type_name, path);
   int type_name_errno = magic_errno(magic_type_name);
 
-  if (type_name_errno > 0) {
-    handle_magic_error(magic_type_name, type_name_errno, result);
-    return;
-  }
+  if (type_name_errno > 0)
+    return handle_magic_error(magic_type_name, type_name_errno, result);
 
   EI_ENSURE(ei_x_encode_atom(result, "ok"));
   EI_ENSURE(ei_x_encode_tuple_header(result, 3));
@@ -378,7 +357,7 @@ void process_file(char *path, ei_x_buff *result) {
                                strlen(mime_encoding_result)));
   EI_ENSURE(
       ei_x_encode_binary(result, type_name_result, strlen(type_name_result)));
-  return;
+  send_and_free(result);
 }
 
 // Adapted from https://erlang.org/doc/tutorial/erl_interface.html
@@ -441,11 +420,15 @@ size_t write_cmd(byte *buf, size_t len) {
   return write_exact(buf, len);
 }
 
+void send_and_free(ei_x_buff *result) {
+  write_cmd(result->buff, result->index);
+  EI_ENSURE(ei_x_free(result));
+}
+
 void error(ei_x_buff *result, const char *error) {
   EI_ENSURE(ei_x_encode_atom(result, "error"));
   EI_ENSURE(ei_x_encode_atom(result, error));
-  write_cmd(result->buff, result->index);
-  EI_ENSURE(ei_x_free(result));
+  send_and_free(result);
 }
 
 void fdseek(uint16_t count) {
