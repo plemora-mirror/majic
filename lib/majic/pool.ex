@@ -15,8 +15,8 @@ defmodule Majic.Pool do
     }
   end
 
-  def start_link(options, pool_size \\ nil) do
-    pool_size = pool_size || System.schedulers_online()
+  def start_link(options) do
+    {pool_size, options} = Keyword.pop(options, :pool_size, System.schedulers_online())
     NimblePool.start_link(worker: {__MODULE__, options}, pool_size: pool_size)
   end
 
