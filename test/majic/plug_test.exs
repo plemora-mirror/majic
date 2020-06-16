@@ -67,6 +67,9 @@ defmodule Majic.PlugTest do
              get_in(conn.params, ["form", "makefile"]).content_type
 
     assert get_in(conn.params, ["form", "makefile"]).content_type == "text/x-makefile"
+    assert get_in(conn.params, ["form", "makefile"]).filename == "mymakefile"
+    assert get_in(conn_no_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
+    assert get_in(conn_append_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
 
     refute get_in(conn.body_params, ["form", "make", "file"]).content_type ==
              get_in(conn.params, ["form", "make", "file"]).content_type
