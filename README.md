@@ -31,7 +31,7 @@ Compilation of the underlying C program is automatic and handled by [elixir_make
 
 Depending on the use case, you may utilise a single (one-off) Majic process without reusing it as a daemon, or utilise a connection pool (such as Poolboy) in your application to run multiple persistent Majic processes.
 
-To use Majic directly, you can use `Majic.Helpers.perform_once/1`:
+To use Majic directly, you can use `Majic.Once.perform/1`:
 
 ```elixir
 iex(1)> Majic.perform(".", once: true)
@@ -67,11 +67,23 @@ When using `Majic.Server.start_link/1` to start a persistent server, or `Majic.H
 
 See `t:Majic.Server.option/0` for details.
 
+__Note__ `:recycle_thresold` is only useful if you are using a libmagic `<5.29`, where it was susceptible to memleaks
+([details](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=840754)]). In future versions of `majic` this option could
+be ignored.
+
+### Reloading / Altering databases
+
+If you want `majic` to reload its database(s), run `Majic.Server.reload(ref)`.
+
+If you want to add or remove databases to a running server, you would have to run `Majic.Server.reload(ref, databases)`
+where databases being the same argument as `database_patterns` on start. `Majic` does not support adding/removing
+databases at runtime without a port reload.
+
 ### Use Cases
 
-### Ad-Hoc Requests
+#### Ad-Hoc Requests
 
-For ad-hoc requests, you can use the helper method `Majic.Helpers.perform_once/2`:
+For ad-hoc requests, you can use the helper method `Majic.Once.perform_once/2`:
 
 ```elixir
 iex(1)> Majic.perform(Path.join(File.cwd!(), "Makefile"), once: true)
@@ -83,63 +95,64 @@ iex(1)> Majic.perform(Path.join(File.cwd!(), "Makefile"), once: true)
 }}
 ```
 
-### Supervised Requests
+#### Supervised Requests
 
 The Server should be run under a supervisor which provides resiliency.
 
-Here we run it under a supervisor:
+Here we run it under a supervisor in an application:
 
 ```elixir
-iex(1)> {:ok, pid} = Supervisor.start_link([{Majic.Server, name: :gen_magic}], strategy: :one_for_one)
-{:ok, #PID<0.199.0>}
+children =
+  [
+    # ...
+    {Majic.Server, [name: YourApp.Majic]}
+  ]
+
+opts = [strategy: :one_for_one, name: YourApp.Supervisor]
+Supervisor.start_link(children, opts)
 ```
 
 Now we can ask it to inspect a file:
 
 ```elixir
-iex(2)> Majic.perform(Path.expand("~/.bash_history"), server: :gen_magic)
+iex(2)> Majic.perform(Path.expand("~/.bash_history"), server: YourApp.Majic)
 {:ok, %Majic.Result{mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"}}
 ```
 
 Note that in this case we have opted to use a named process.
 
-### Pool
+#### Pool
 
 For concurrency *and* resiliency, you may start the `Majic.Pool`. By default, it will start a `Majic.Server`
 worker per online scheduler:
 
 You can add a pool in your application supervisor by adding it as a child:
 
-```
-    children =
-      [
-        # ...
-        {Majic.Pool, [name: YourApp.MajicPool, pool_size: 2]}
-      ]
+```elixir
+children =
+  [
+    # ...
+    {Majic.Pool, [name: YourApp.MajicPool, pool_size: 2]}
+  ]
 
-    opts = [strategy: :one_for_one, name: YourApp.Supervisor]
-    Supervisor.start_link(children, opts)
+opts = [strategy: :one_for_one, name: YourApp.Supervisor]
+Supervisor.start_link(children, opts)
 ```
 
 And then you can use it with `Majic.perform/2` with `pool: YourApp.MajicPool` option:
 
-```
+```elixir
 iex(1)> Majic.perform(Path.expand("~/.bash_history"), pool: YourApp.MajicPool)
 {:ok, %Majic.Result{mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"}}
 ```
 
-### Check Uploaded Files
+#### Use with Plug.Upload
 
-If you use Phoenix, you can inspect the file from your controller:
+If you use Plug or Phoenix, you may want to automatically verify the content type of every `Plug.Upload`. The
+`Majic.Plug` is there for this.
 
-```elixir
-def upload(conn, %{"upload" => %{path: path}}) do,
-  {:ok, result} = Majic.perform(path, server: :gen_magic)
-  text(conn, "Received your file containing #{result.content}")
-end
-```
-
-Obviously, it will be more ideal if you have wrapped `Majic.Server` in a pool such as Poolboy, to avoid constantly starting and stopping the underlying C program.
+Enable it by using `plug Majic.Plug, pool: YourApp.MajicPool` in your pipeline or controller. Then, every `Plug.Upload`
+in `conn.params` is now verified. The filename is also altered with an extension matching its content-type.
 
 ## Notes
 
@@ -165,3 +178,4 @@ thanks all contributors for their generosity:
   - Soak Testing
 - Matthias and Ced for helping the author with C oddities
 - [Hecate](https://github.com/Kleidukos) for laughing at aforementionned oddities
+- majic for giving inspiration for the lib name (magic, majic, get it? hahaha..)

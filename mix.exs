@@ -11,6 +11,7 @@ defmodule Majic.MixProject do
       version: "1.0.0",
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
+      elixirc_options: [warnings_as_errors: warnings_as_errors(Mix.env())],
       start_permanent: Mix.env() == :prod,
       compilers: [:elixir_make] ++ Mix.compilers(),
       package: package(),
@@ -32,7 +33,7 @@ defmodule Majic.MixProject do
 
   defp dialyzer do
     [
-      plt_add_apps: [:mix, :iex, :ex_unit],
+      plt_add_apps: [:mix, :iex, :ex_unit, :plug, :mime],
       flags: ~w(error_handling no_opaque race_conditions underspecs unmatched_returns)a,
       ignore_warnings: "dialyzer-ignore-warnings.exs",
       list_unused_filters: true
@@ -41,11 +42,13 @@ defmodule Majic.MixProject do
 
   defp deps do
     [
-      {:credo, "~> 1.4.0", only: [:dev, :test], runtime: false},
+      {:nimble_pool, "~> 0.1"},
+      {:plug, "~> 1.0", optional: true},
+      {:mime, "~> 1.0", optional: true},
+      {:credo, "~> 1.4", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0.0-rc.6", only: :dev, runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:elixir_make, "~> 0.4", runtime: false},
-      {:nimble_pool, "~> 0.1"}
+      {:elixir_make, "~> 0.4", runtime: false}
     ]
   end
 
@@ -53,8 +56,8 @@ defmodule Majic.MixProject do
     [
       files: ~w(lib/gen_magic/* src/*.c Makefile),
       licenses: ["Apache 2.0"],
-      links: %{"GitHub" => "https://github.com/evadne/packmatic"},
-      source_url: "https://github.com/evadne/packmatic"
+      links: %{"GitHub" => "https://github.com/hrefhref/majic"},
+      source_url: "https://github.com/hrefhref/majic"
     ]
   end
 
@@ -64,4 +67,7 @@ defmodule Majic.MixProject do
       extras: ["README.md", "CHANGELOG.md"]
     ]
   end
+
+  defp warnings_as_errors(:dev), do: false
+  defp warnings_as_errors(_), do: true
 end

@@ -10,7 +10,8 @@ defmodule Majic.Server do
   alias Majic.Server.Data
   alias Majic.Server.Status
   import Kernel, except: [send: 2]
-  require Logger
+  @database_patterns [:default]
+  @process_timeout Majic.Config.default_process_timeout()
 
   @typedoc """
   Represents the reference to the underlying server, as returned by `:gen_statem`.
@@ -41,7 +42,7 @@ defmodule Majic.Server do
 
     Can be set to `:infinity` if you do not wish for the program to be recycled.
 
-  - `:database_patterns`: Specifies what magic databases to load; you can specify a list of either
+  - `:database_patterns`: Specifies what magic databases to load; you can specify a list of files, or of
     Path Patterns (see `Path.wildcard/2`) or `:default` to instruct the C program to load the
     appropriate databases.
 
@@ -49,16 +50,12 @@ defmodule Majic.Server do
 
         [:default, "path/to/my/magic"]
   """
-  @database_patterns [:default]
-  @type option ::
+  @type start_option ::
           {:name, atom() | :gen_statem.server_name()}
           | {:startup_timeout, timeout()}
           | {:process_timeout, timeout()}
           | {:recycle_threshold, non_neg_integer() | :infinity}
           | {:database_patterns, nonempty_list(:default | Path.t())}
-
-  @type target :: Path.t() | {:bytes, binary()}
-  @type result :: {:ok, Result.t()} | {:error, term() | String.t()}
 
   @typedoc """
   Current state of the Server:
@@ -84,9 +81,9 @@ defmodule Majic.Server do
   """
   @type state :: :starting | :processing | :available | :recycling
 
-  @spec child_spec([option()]) :: Supervisor.child_spec()
-  @spec start_link([option()]) :: :gen_statem.start_ret()
-  @spec perform(t(), target(), timeout()) :: result()
+  @spec child_spec([start_option()]) :: Supervisor.child_spec()
+  @spec start_link([start_option()]) :: :gen_statem.start_ret()
+  @spec perform(t(), Majic.target(), timeout()) :: Majic.result()
   @spec status(t(), timeout()) :: {:ok, Status.t()} | {:error, term()}
   @spec stop(t(), term(), timeout()) :: :ok
 
@@ -125,7 +122,7 @@ defmodule Majic.Server do
   @doc """
   Determines the type of the file provided.
   """
-  def perform(server_ref, path, timeout \\ 5000) do
+  def perform(server_ref, path, timeout \\ @process_timeout) do
     case :gen_statem.call(server_ref, {:perform, path}, timeout) do
       {:ok, %Result{} = result} -> {:ok, result}
       {:error, reason} -> {:error, reason}
@@ -135,21 +132,21 @@ defmodule Majic.Server do
   @doc """
   Reloads a Server with a new set of databases.
   """
-  def reload(server_ref, database_patterns \\ nil, timeout \\ 5000) do
+  def reload(server_ref, database_patterns \\ nil, timeout \\ @process_timeout) do
     :gen_statem.call(server_ref, {:reload, database_patterns}, timeout)
   end
 
   @doc """
   Same as `reload/2,3` but with a full restart of the underlying C port.
   """
-  def recycle(server_ref, database_patterns \\ nil, timeout \\ 5000) do
+  def recycle(server_ref, database_patterns \\ nil, timeout \\ @process_timeout) do
     :gen_statem.call(server_ref, {:recycle, database_patterns}, timeout)
   end
 
   @doc """
   Returns status of the Server.
   """
-  def status(server_ref, timeout \\ 5000) do
+  def status(server_ref, timeout \\ @process_timeout) do
     :gen_statem.call(server_ref, :status, timeout)
   end
 
@@ -173,7 +170,7 @@ defmodule Majic.Server do
 
     data = %Data{
       port_name: get_port_name(),
-      database_patterns: Keyword.get(options, :database_patterns, []),
+      database_patterns: Keyword.get(options, :database_patterns),
       port_options: get_port_options(options),
       startup_timeout: get_startup_timeout(options),
       process_timeout: get_process_timeout(options),
@@ -223,6 +220,7 @@ defmodule Majic.Server do
         1 -> :bad_db
         2 -> :ei_error
         3 -> :ei_bad_term
+        4 -> :magic_error
         code -> {:unexpected_error, code}
       end
 
@@ -237,14 +235,11 @@ defmodule Majic.Server do
         pattern -> Path.wildcard(pattern)
       end)
 
-    databases =
-      if databases == [] do
-        [:default]
-      else
-        databases
-      end
-
-    {:keep_state, {databases, data}, {:state_timeout, 0, :load}}
+    if databases == [] do
+      {:stop, {:error, :no_databases_to_load}, data}
+    else
+      {:keep_state, {databases, data}, {:state_timeout, 0, :load}}
+    end
   end
 
   @doc false
@@ -258,11 +253,11 @@ defmodule Majic.Server do
   end
 
   @doc false
-  def loading(:state_timeout, :load, {[database | databases], data} = state) do
+  def loading(:state_timeout, :load, {[database | _databases], data} = state) do
     command =
       case database do
         :default -> {:add_default_database, nil}
-        path -> {:add_database, database}
+        path -> {:add_database, path}
       end
 
     send(data.port, command)
@@ -274,16 +269,14 @@ defmodule Majic.Server do
     case :erlang.binary_to_term(response) do
       {:ok, :loaded} ->
         {:keep_state, {databases, data}, {:state_timeout, 0, :load}}
+
+      {:error, :not_loaded} ->
+        {:stop, {:error, {:database_load_failed, database}}, data}
     end
   end
 
   @doc false
-  def loading(:info, {port, {:exit_status, 1}}, {[database | _], %{port: port} = data}) do
-    {:stop, {:error, {:database_not_found, database}}, data}
-  end
-
-  @doc false
-  def loading({:call, from}, :status, {[database | _], data}) do
+  def loading({:call, from}, :status, {_, data}) do
     handle_status_call(from, :loading, data)
   end
 
@@ -310,6 +303,8 @@ defmodule Majic.Server do
     arg =
       case path do
         path when is_binary(path) -> {:file, path}
+        # Truncate to 50 bytes
+        {:bytes, <<bytes::size(50), _::binary>>} -> {:bytes, bytes}
         {:bytes, bytes} -> {:bytes, bytes}
       end
 
@@ -360,7 +355,7 @@ defmodule Majic.Server do
   end
 
   @doc false
-  def processing(:state_timeout, _, %{port: port, request: {_, from, _}} = data) do
+  def processing(:state_timeout, _, %{request: {_, from, _}} = data) do
     response = {:reply, from, {:error, :timeout}}
     {:next_state, :recycling, %{data | request: nil}, [response, :hibernate]}
   end
@@ -397,7 +392,7 @@ defmodule Majic.Server do
 
   @doc false
   def recycling(:state_timeout, :close, data) do
-    {:stop, {:error, :port_close_failed}}
+    {:stop, {:error, :port_close_failed}, data}
   end
 
   @doc false

@@ -18,12 +18,13 @@ The format is based on [Keep a Changelog][1], and this project adheres to [Seman
 ## Changed
 
 - C port now using erl_interface
+- Builds on Musl
+- Better error and timeout handling
 - `Majic.Server.reload/2,3`
 - `Majic.Server.recycle/2,3`
 - Bytes support: `Majic.Server.perform(ref, {:bytes, <<>>})`
-- Builds on Musl
-- Better error and timeout handling
 - Renamed `priv/apprentice` to `priv/libmagic_port` to be more obvious in `ps`
+- Renamed `Majic.Helpers.perform_once` to `Majic.Once.perform`
 
 ## gen_majic [1.0]
 

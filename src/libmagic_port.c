@@ -1,5 +1,5 @@
 //
-// The Sorcerer’s Apprentice
+// libmagic_port: The Sorcerer’s Apprentice
 //
 // To use this program, compile it with dynamically linked libmagic, as mirrored
 // at https://github.com/file/file. You may install it with apt-get,
@@ -24,12 +24,15 @@
 // Commands are sent to the program STDIN as an erlang term of `{Operation,
 // Argument}`, and response of `{:ok | :error, Response}`.
 //
+// The program may exit with the following exit codes:
+//  - 1 if libmagic handles could not be opened,
+//  - 2 if something went wrong with ei_*,
+//  - 3 if you sent invalid term format,
+//  - 255 if the loop exited unexpectedly.
+//
 // Invalid packets will cause the program to exit (exit code 3). This will
 // happen if your Erlang Term format doesn't match the version the program has
-// been compiled with, or if you send a command too huge.
-//
-// The program may exit with exit code 3 if something went wrong with ei_*
-// functions.
+// been compiled with.
 //
 // Commands:
 // {:reload, _} :: :ready
@@ -47,6 +50,7 @@
 #include <libgen.h>
 #include <magic.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,7 +59,7 @@
 #include <unistd.h>
 
 #define ERROR_OK 0
-#define ERROR_DB 1
+#define ERROR_MAGIC 1
 #define ERROR_EI 2
 #define ERROR_BAD_TERM 3
 
@@ -78,6 +82,7 @@ magic_t magic_setup(int flags);
 typedef char byte;
 
 void setup_environment();
+void magic_close_all();
 void magic_open_all();
 int magic_load_all(char *path);
 int process_command(uint16_t len, byte *buf);
@@ -92,6 +97,8 @@ void fdseek(uint16_t count);
 static magic_t magic_mime_type;     // MAGIC_MIME_TYPE
 static magic_t magic_mime_encoding; // MAGIC_MIME_ENCODING
 static magic_t magic_type_name;     // MAGIC_NONE
+
+bool magic_loaded = false;
 
 int main(int argc, char **argv) {
   EI_ENSURE(ei_init());
@@ -143,37 +150,47 @@ int process_command(uint16_t len, byte *buf) {
 
   // {:file, path}
   if (strlen(atom) == 4 && strncmp(atom, "file", 4) == 0) {
-    char path[4097];
-    ei_get_type(buf, &index, &termtype, &termsize);
+    if (magic_loaded) {
+      char path[4097];
+      ei_get_type(buf, &index, &termtype, &termsize);
 
-    if (termtype == ERL_BINARY_EXT) {
-      if (termsize < 4096) {
-        long bin_length;
-        EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
-        path[termsize] = '\0';
-        process_file(path, &result);
+      if (termtype == ERL_BINARY_EXT) {
+        if (termsize < 4096) {
+          long bin_length;
+          EI_ENSURE(ei_decode_binary(buf, &index, path, &bin_length));
+          path[termsize] = '\0';
+          process_file(path, &result);
+        } else {
+          error(&result, "enametoolong");
+          return 1;
+        }
       } else {
-        error(&result, "enametoolong");
+        error(&result, "badarg");
         return 1;
       }
     } else {
-      error(&result, "badarg");
+      error(&result, "magic_database_not_loaded");
       return 1;
     }
     // {:bytes, bytes}
   } else if (strlen(atom) == 5 && strncmp(atom, "bytes", 5) == 0) {
-    int termtype;
-    int termsize;
-    char bytes[51];
-    EI_ENSURE(ei_get_type(buf, &index, &termtype, &termsize));
+    if (magic_loaded) {
+      int termtype;
+      int termsize;
+      char bytes[51];
+      EI_ENSURE(ei_get_type(buf, &index, &termtype, &termsize));
 
-    if (termtype == ERL_BINARY_EXT && termsize < 50) {
-      long bin_length;
-      EI_ENSURE(ei_decode_binary(buf, &index, bytes, &bin_length));
-      bytes[termsize] = '\0';
-      process_bytes(bytes, termsize, &result);
+      if (termtype == ERL_BINARY_EXT && termsize < 50) {
+        long bin_length;
+        EI_ENSURE(ei_decode_binary(buf, &index, bytes, &bin_length));
+        bytes[termsize] = '\0';
+        process_bytes(bytes, termsize, &result);
+      } else {
+        error(&result, "badarg");
+        return 1;
+      }
     } else {
-      error(&result, "badarg");
+      error(&result, "magic_database_not_loaded");
       return 1;
     }
     // {:add_database, path}
@@ -190,7 +207,8 @@ int process_command(uint16_t len, byte *buf) {
           EI_ENSURE(ei_x_encode_atom(&result, "ok"));
           EI_ENSURE(ei_x_encode_atom(&result, "loaded"));
         } else {
-          exit(ERROR_DB);
+          EI_ENSURE(ei_x_encode_atom(&result, "error"));
+          EI_ENSURE(ei_x_encode_atom(&result, "not_loaded"));
         }
       } else {
         error(&result, "enametoolong");
@@ -207,7 +225,8 @@ int process_command(uint16_t len, byte *buf) {
       EI_ENSURE(ei_x_encode_atom(&result, "ok"));
       EI_ENSURE(ei_x_encode_atom(&result, "loaded"));
     } else {
-      exit(ERROR_DB);
+      EI_ENSURE(ei_x_encode_atom(&result, "error"));
+      EI_ENSURE(ei_x_encode_atom(&result, "not_loaded"));
     }
     // {:reload, _}
   } else if (strlen(atom) == 6 && strncmp(atom, "reload", 6) == 0) {
@@ -230,25 +249,37 @@ int process_command(uint16_t len, byte *buf) {
 
 void setup_environment() { opterr = 0; }
 
-void magic_open_all() {
+void magic_close_all() {
+  magic_loaded = false;
   if (magic_mime_encoding) {
     magic_close(magic_mime_encoding);
+    magic_mime_encoding = NULL;
   }
   if (magic_mime_type) {
     magic_close(magic_mime_type);
+    magic_mime_type = NULL;
   }
   if (magic_type_name) {
     magic_close(magic_type_name);
+    magic_type_name = NULL;
   }
+}
+
+void magic_open_all() {
+  magic_close_all();
   magic_mime_encoding = magic_open(MAGIC_FLAGS_COMMON | MAGIC_MIME_ENCODING);
   magic_mime_type = magic_open(MAGIC_FLAGS_COMMON | MAGIC_MIME_TYPE);
   magic_type_name = magic_open(MAGIC_FLAGS_COMMON | MAGIC_NONE);
 
-  ei_x_buff ok_buf;
-  EI_ENSURE(ei_x_new_with_version(&ok_buf));
-  EI_ENSURE(ei_x_encode_atom(&ok_buf, "ready"));
-  write_cmd(ok_buf.buff, ok_buf.index);
-  EI_ENSURE(ei_x_free(&ok_buf));
+  if (magic_mime_encoding && magic_mime_type && magic_type_name) {
+    ei_x_buff ok_buf;
+    EI_ENSURE(ei_x_new_with_version(&ok_buf));
+    EI_ENSURE(ei_x_encode_atom(&ok_buf, "ready"));
+    write_cmd(ok_buf.buff, ok_buf.index);
+    EI_ENSURE(ei_x_free(&ok_buf));
+  } else {
+    exit(ERROR_MAGIC);
+  }
 }
 
 int magic_load_all(char *path) {
@@ -263,6 +294,7 @@ int magic_load_all(char *path) {
   if ((res = magic_load(magic_type_name, path)) != 0) {
     return res;
   }
+  magic_loaded = true;
   return 0;
 }
 

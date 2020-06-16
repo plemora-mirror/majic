@@ -12,5 +12,6 @@ defmodule Majic.PoollTest do
     assert {:ok, _} = Majic.Pool.perform(TestPool, absolute_path("Makefile"))
     assert {:ok, _} = Majic.Pool.perform(TestPool, absolute_path("Makefile"))
     assert {:ok, _} = Majic.Pool.perform(TestPool, absolute_path("Makefile"))
+    assert {:ok, _} = Majic.perform(absolute_path("Makefile"), pool: TestPool)
   end
 end

@@ -2,6 +2,9 @@ defmodule Majic.Pool do
   @behaviour NimblePool
   @moduledoc "Pool of `Majic.Server`"
 
+  @type name :: atom()
+  @type option :: {:pool_timeout, timeout()} | {:timeout, timeout()}
+
   def child_spec(opts) do
     %{
       id: __MODULE__,
@@ -17,9 +20,10 @@ defmodule Majic.Pool do
     NimblePool.start_link(worker: {__MODULE__, options}, pool_size: pool_size)
   end
 
+  @spec perform(name(), Majic.target(), [option()]) :: Majic.result()
   def perform(pool, path, opts \\ []) do
-    pool_timeout = Keyword.get(opts, :pool_timeout, 5000)
-    timeout = Keyword.get(opts, :timeout, 5000)
+    pool_timeout = Keyword.get(opts, :pool_timeout, Majic.Config.default_process_timeout())
+    timeout = Keyword.get(opts, :timeout, Majic.Config.default_process_timeout())
 
     NimblePool.checkout!(
       pool,

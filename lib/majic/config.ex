@@ -6,6 +6,8 @@ defmodule Majic.Config do
   @process_timeout 30_000
   @recycle_threshold :infinity
 
+  def default_process_timeout, do: @process_timeout
+
   def get_port_name do
     {:spawn_executable, to_charlist(get_executable_name())}
   end

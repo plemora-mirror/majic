@@ -7,6 +7,6 @@ erl_crash.dump
 *.ez
 *.beam
 /config/*.secret.exs
-/priv/apprentice
-/src/*.o
+/priv/libmagic_port
 /test/*.mgc
+core.*

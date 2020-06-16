@@ -11,6 +11,12 @@ defmodule MajicTest do
     assert {:ok, %{mime_type: "text/x-makefile"}} = Majic.Server.perform(pid, path)
   end
 
+  test "With Majic.perform" do
+    {:ok, pid} = Majic.Server.start_link([])
+    path = absolute_path("Makefile")
+    assert {:ok, %{mime_type: "text/x-makefile"}} = Majic.perform(path, server: pid)
+  end
+
   @tag external: true
   test "Load test local files" do
     {:ok, pid} = Majic.Server.start_link([])

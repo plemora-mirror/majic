@@ -1,4 +1,4 @@
-defmodule Majic.ApprenticeTest do
+defmodule Majic.PortTest do
   use Majic.MagicCase
 
   @tmp_path "/tmp/testgenmagicx"
@@ -7,18 +7,10 @@ defmodule Majic.ApprenticeTest do
   test "sends ready" do
     port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
     on_exit(fn -> send(port, {self(), :close}) end)
-    assert_ready_and_init_default(port)
+    assert_ready(port)
   end
 
-  test "stops" do
-    port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
-    on_exit(fn -> send(port, {self(), :close}) end)
-    assert_ready_and_init_default(port)
-    send(port, {self(), {:command, :erlang.term_to_binary({:stop, :stop})}})
-    assert_receive {^port, {:exit_status, 0}}
-  end
-
-  test "exits with non existent database with an error" do
+  test "errors with non existent database with an error" do
     opts = [:use_stdio, :binary, :exit_status, {:packet, 2}, {:args, []}]
     port = Port.open(Majic.Config.get_port_name(), opts)
     on_exit(fn -> send(port, {self(), :close}) end)
@@ -29,7 +21,54 @@ defmodule Majic.ApprenticeTest do
       {self(), {:command, :erlang.term_to_binary({:add_database, "/somewhere/nowhere"})}}
     )
 
-    assert_receive {^port, {:exit_status, 1}}
+    assert_receive {^port, {:data, data}}
+    assert {:error, :not_loaded} == :erlang.binary_to_term(data)
+  end
+
+  test "loads default database" do
+    opts = [:use_stdio, :binary, :exit_status, {:packet, 2}, {:args, []}]
+    port = Port.open(Majic.Config.get_port_name(), opts)
+    on_exit(fn -> send(port, {self(), :close}) end)
+    assert_ready(port)
+
+    send(
+      port,
+      {self(), {:command, :erlang.term_to_binary({:add_default_database, nil})}}
+    )
+
+    assert_receive {^port, {:data, data}}
+    assert {:ok, :loaded} == :erlang.binary_to_term(data)
+  end
+
+  test "reloads" do
+    opts = [:use_stdio, :binary, :exit_status, {:packet, 2}, {:args, []}]
+    port = Port.open(Majic.Config.get_port_name(), opts)
+    on_exit(fn -> send(port, {self(), :close}) end)
+    assert_ready_and_init_default(port)
+
+    send(port, {self(), {:command, :erlang.term_to_binary({:reload, :reload})}})
+
+    assert_ready(port)
+  end
+
+  test "errors when no database loaded" do
+    opts = [:use_stdio, :binary, :exit_status, {:packet, 2}, {:args, []}]
+    port = Port.open(Majic.Config.get_port_name(), opts)
+    on_exit(fn -> send(port, {self(), :close}) end)
+    assert_ready(port)
+
+    send(port, {self(), {:command, :erlang.term_to_binary({:bytes, "hello world"})}})
+    assert_receive {^port, {:data, data}}
+    assert {:error, :magic_database_not_loaded} = :erlang.binary_to_term(data)
+    refute_receive _
+  end
+
+  test "stops" do
+    port = Port.open(Majic.Config.get_port_name(), Majic.Config.get_port_options([]))
+    on_exit(fn -> send(port, {self(), :close}) end)
+    assert_ready_and_init_default(port)
+    send(port, {self(), {:command, :erlang.term_to_binary({:stop, :stop})}})
+    assert_receive {^port, {:exit_status, 0}}
   end
 
   describe "port" do
