@@ -44,6 +44,16 @@ defmodule Majic.PlugTest do
     Content-Type: image/jpg\r
     \r
     #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
+    ------w58EW1cEpjzydSCq\r
+    Content-Disposition: form-data; name=\"cats[]\"; filename*=\"utf-8''first-cute-cat.jpg\"\r
+    Content-Type: image/jpg\r
+    \r
+    #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
+    ------w58EW1cEpjzydSCq\r
+    Content-Disposition: form-data; name=\"cats[]\"; filename*=\"utf-8''second-cute-cat.jpg\"\r
+    Content-Type: image/jpg\r
+    \r
+    #{String.replace(File.read!("test/fixtures/cat.webp"), "\n", "\n")}\r
     ------w58EW1cEpjzydSCq--\r
     """
 
@@ -81,5 +91,7 @@ defmodule Majic.PlugTest do
     assert get_in(conn.params, ["cat"]).filename == "cute-cat.webp"
     assert get_in(conn_no_ext.params, ["cat"]).filename == "cute-cat.jpg"
     assert get_in(conn_append_ext.params, ["cat"]).filename == "cute-cat.jpg.webp"
+
+    assert Enum.all?(conn.params["cats"], fn upload -> upload.content_type == "image/webp" end)
   end
 end

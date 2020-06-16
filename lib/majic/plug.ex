@@ -42,12 +42,9 @@ if Code.ensure_loaded?(Plug) do
         true -> raise(Majic.PlugError, "No server/pool/once option defined")
       end
 
-      opts =
-        opts
-        |> Keyword.put_new(:fix_extension, true)
-        |> Keyword.put_new(:append_extension, false)
-
       opts
+      |> Keyword.put_new(:fix_extension, true)
+      |> Keyword.put_new(:append_extension, false)
     end
 
     @impl Plug
@@ -55,6 +52,15 @@ if Code.ensure_loaded?(Plug) do
       collected = collect_uploads([], conn.body_params, [])
 
       Enum.reduce(collected, conn, fn {param_path, upload}, conn ->
+        {array_index, param_path} =
+          case param_path do
+            [index, :array | path] ->
+              {index, path}
+
+            path ->
+              {nil, path}
+          end
+
         param_path = Enum.reverse(param_path)
 
         upload =
@@ -63,14 +69,9 @@ if Code.ensure_loaded?(Plug) do
             {:error, error} -> raise(Majic.PlugError, "Failed to majic: #{inspect(error)}")
           end
 
-        conn =
-          if get_in(conn.params, param_path) do
-            %{conn | params: put_in(conn.params, param_path, upload)}
-          end
-
-        if get_in(conn.body_params, param_path) do
-          %{conn | body_params: put_in(conn.body_params, param_path, upload)}
-        end
+        conn
+        |> put_in_if_exists(:params, param_path, upload, array_index)
+        |> put_in_if_exists(:body_params, param_path, upload, array_index)
       end)
     end
 
@@ -91,6 +92,12 @@ if Code.ensure_loaded?(Plug) do
     # Nested map.
     defp collect_upload(path, {k, v}, acc) when is_map(v) do
       collect_uploads([k | path], v, acc)
+    end
+
+    defp collect_upload(path, {k, v}, acc) when is_list(v) do
+      Enum.reduce(Enum.with_index(v), acc, fn {item, index}, acc ->
+        collect_upload([:array, k | path], {index, item}, acc)
+      end)
     end
 
     defp collect_upload(_path, _, acc) do
@@ -163,6 +170,25 @@ if Code.ensure_loaded?(Plug) do
     # Rewrite
     defp rewrite_or_append_extension(basename, _, ext, _) do
       basename <> "." <> ext
+    end
+
+    # put value at path in conn.
+    defp put_in_if_exists(conn, key, path, value, nil) do
+      if get_in(Map.get(conn, key), path) do
+        Map.put(conn, key, put_in(Map.get(conn, key), path, value))
+      else
+        conn
+      end
+    end
+
+    # change value at index in list at path in conn.
+    defp put_in_if_exists(conn, key, path, value, index) do
+      if array = get_in(Map.get(conn, key), path) do
+        array = List.replace_at(array, index, value)
+        Map.put(conn, key, put_in(Map.get(conn, key), path, array))
+      else
+        conn
+      end
     end
   end
 end
