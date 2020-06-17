@@ -10,22 +10,22 @@ if Code.ensure_loaded?(Plug) do
     One of the required option of `pool`, `server` or `once` must be set.
 
     Additional options:
-    * `fix_extension`, default true: rewrite the user provided `filename` with a valid extension for the detected content type
-    * `append_extension`, default false: append the valid extension to the previous filename, without removing the user provided extension
+    * `fix_extension`, default true: enable use of `Majic.Extension`,
+    * options for `Majic.Extension`.
 
-    To use a gen_magic pool:
+    To use a majic pool:
 
     ```
     plug Majic.Plug, pool: MyApp.MajicPool
     ```
 
-    To use a single gen_magic server:
+    To use a single majic server:
 
     ```
     plug Majic.Plug, server: MyApp.MajicServer
     ```
 
-    To start a gen_magic process at each file (not recommended):
+    To start a majic process at each file (not recommended):
 
     ```
     plug Majic.Plug, once: true
@@ -44,7 +44,8 @@ if Code.ensure_loaded?(Plug) do
 
       opts
       |> Keyword.put_new(:fix_extension, true)
-      |> Keyword.put_new(:append_extension, false)
+      |> Keyword.put_new(:append, false)
+      |> Keyword.put_new(:subtype_as_extension, false)
     end
 
     @impl Plug
@@ -105,71 +106,18 @@ if Code.ensure_loaded?(Plug) do
     end
 
     defp fix_upload(upload, magic, opts) do
-      %{upload | content_type: magic.mime_type}
-      |> fix_extension(Keyword.get(opts, :fix_extension), opts)
-    end
+      filename =
+        if Keyword.get(opts, :fix_extension) do
+          IO.puts("FIXING EXTENSION #{inspect opts}")
+          ext_opts = [
+            append: Keyword.get(opts, :append, false),
+            subtype_as_extension: Keyword.get(opts, :subtype_as_extension, false)
+          ]
 
-    defp fix_extension(upload, true, opts) do
-      old_ext = String.downcase(Path.extname(upload.filename))
-      extensions = MIME.extensions(upload.content_type)
-      rewrite_extension(upload, old_ext, extensions, opts)
-    end
+          Majic.Extension.fix(upload.filename, magic, ext_opts)
+        end
 
-    defp fix_extension(upload, _, _) do
-      upload
-    end
-
-    defp rewrite_extension(upload, old, [ext | _] = exts, opts) do
-      if old in exts do
-        upload
-      else
-        basename = Path.basename(upload.filename, old)
-
-        %{
-          upload
-          | filename:
-              rewrite_or_append_extension(
-                basename,
-                old,
-                ext,
-                Keyword.get(opts, :append_extension)
-              )
-        }
-      end
-    end
-
-    # No extension for type.
-    defp rewrite_extension(upload, old, [], opts) do
-      %{
-        upload
-        | filename:
-            rewrite_or_append_extension(
-              Path.basename(upload.filename, old),
-              old,
-              nil,
-              Keyword.get(opts, :append_extension)
-            )
-      }
-    end
-
-    # Append, no extension for type: keep old extension
-    defp rewrite_or_append_extension(basename, "." <> old, nil, true) do
-      basename <> "." <> old
-    end
-
-    # No extension for type: only keep basename
-    defp rewrite_or_append_extension(basename, _, nil, _) do
-      basename
-    end
-
-    # Append
-    defp rewrite_or_append_extension(basename, "." <> old, ext, true) do
-      Enum.join([basename, old, ext], ".")
-    end
-
-    # Rewrite
-    defp rewrite_or_append_extension(basename, _, ext, _) do
-      basename <> "." <> ext
+      %{upload | content_type: magic.mime_type, filename: filename || upload.filename}
     end
 
     # put value at path in conn.

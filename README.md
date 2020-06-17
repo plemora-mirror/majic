@@ -145,6 +145,16 @@ And then you can use it with `Majic.perform/2` with `pool: YourApp.MajicPool` op
 iex(1)> Majic.perform(Path.expand("~/.bash_history"), pool: YourApp.MajicPool)
 {:ok, %Majic.Result{mime_type: "text/plain", encoding: "us-ascii", content: "ASCII text"}}
 ```
+#### Fixing extensions
+
+You may also want to fix the user-provided filename according to its detected MIME type. To do this, you can use `Majic.Extension.fix/3`:
+
+```elixir
+iex(1)> {:ok, result} = Majic.perform("cat.jpeg", once: true)
+{:ok, %Majic.Result{mime_type: "image/webp", ...}}
+iex(1)> Majic.Extension.fix("cat.jpeg", result)
+"cat.webp"
+```
 
 #### Use with Plug.Upload
 
@@ -152,7 +162,8 @@ If you use Plug or Phoenix, you may want to automatically verify the content typ
 `Majic.Plug` is there for this.
 
 Enable it by using `plug Majic.Plug, pool: YourApp.MajicPool` in your pipeline or controller. Then, every `Plug.Upload`
-in `conn.params` is now verified. The filename is also altered with an extension matching its content-type.
+in `conn.params` and `conn.body_params` is now verified. The filename is also altered with an extension matching its
+content-type, using `Majic.Extension`.
 
 ## Notes
 

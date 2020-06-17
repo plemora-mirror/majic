@@ -59,6 +59,11 @@ defmodule Majic.PlugTest do
     Content-Type: image/jpg\r
     \r
     #{File.read!("test/fixtures/cat.webp")}\r
+    ------w58EW1cEpjzydSCq\r
+    Content-Disposition: form-data; name=\"cats[][inception][cat]\"; filename*=\"utf-8''third-cute-cat.jpg\"\r
+    Content-Type: image/jpg\r
+    \r
+    #{File.read!("test/fixtures/cat.webp")}\r
     ------w58EW1cEpjzydSCq--\r
     """
 
@@ -69,7 +74,7 @@ defmodule Majic.PlugTest do
 
     plug = Majic.Plug.init(once: true)
     plug_no_ext = Majic.Plug.init(once: true, fix_extension: false)
-    plug_append_ext = Majic.Plug.init(once: true, fix_extension: true, append_extension: true)
+    plug_append_ext = Majic.Plug.init(once: true, fix_extension: true, append: true)
 
     conn = Majic.Plug.call(orig_conn, plug)
     conn_no_ext = Majic.Plug.call(orig_conn, plug_no_ext)
@@ -84,7 +89,7 @@ defmodule Majic.PlugTest do
     assert get_in(conn.params, ["form", "makefile"]).content_type == "text/x-makefile"
     assert get_in(conn.params, ["form", "makefile"]).filename == "mymakefile"
     assert get_in(conn_no_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
-    assert get_in(conn_append_ext.params, ["form", "makefile"]).filename == "mymakefile.txt"
+    assert get_in(conn_append_ext.params, ["form", "makefile"]).filename == "mymakefile"
 
     assert get_in(conn.body_params, ["form", "make", "file"]) ==
              get_in(conn.params, ["form", "make", "file"])
@@ -98,8 +103,9 @@ defmodule Majic.PlugTest do
     assert get_in(conn_append_ext.params, ["cat"]).filename == "cute-cat.jpg.webp"
 
     assert Enum.all?(conn.params["cats"], fn
-      %Plug.Upload{} = upload -> upload.content_type == "image/webp"
-      _ -> true
-    end)
+             %Plug.Upload{} = upload -> upload.content_type == "image/webp"
+             %{"inception" => %{"cat" => upload}} -> upload.content_type == "image/webp"
+             _ -> true
+           end)
   end
 end
