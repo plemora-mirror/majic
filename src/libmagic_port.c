@@ -43,6 +43,9 @@
 
 #include <arpa/inet.h>
 #include <ei.h>
+#ifdef EI_INCOMPLETE
+#include <erl_interface.h>
+#endif
 #include <errno.h>
 #include <getopt.h>
 #include <libgen.h>
@@ -104,7 +107,11 @@ static magic_t magic_type_name;     // MAGIC_NONE
 bool magic_loaded = false;
 
 int main(int argc, char **argv) {
+#ifdef EI_INCOMPLETE
+  erl_init(NULL, -1);
+#else
   EI_ENSURE(ei_init());
+#endif
   setup_environment();
   magic_open_all();
 

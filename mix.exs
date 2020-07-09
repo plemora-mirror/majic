@@ -14,6 +14,7 @@ defmodule Majic.MixProject do
       elixirc_options: [warnings_as_errors: warnings_as_errors(Mix.env())],
       start_permanent: Mix.env() == :prod,
       compilers: [:elixir_make] ++ Mix.compilers(),
+      make_env: make_env(),
       package: package(),
       deps: deps(),
       dialyzer: dialyzer(),
@@ -70,4 +71,14 @@ defmodule Majic.MixProject do
 
   defp warnings_as_errors(:dev), do: false
   defp warnings_as_errors(_), do: true
+
+  defp make_env() do
+    otp = :erlang.system_info(:otp_release)
+          |> to_string()
+          |> String.to_integer()
+
+    ei_incomplete = if(otp < 21.3, do: "YES", else: "NO")
+    %{"EI_INCOMPLETE" => ei_incomplete}
+  end
+
 end
