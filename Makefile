@@ -1,6 +1,6 @@
-CFLAGS = -std=c99 -g -Wall -Werror
-CPPFLAGS = -I$(ERL_EI_INCLUDE_DIR) -I/usr/local/include
-LDFLAGS = -L$(ERL_EI_LIBDIR) -L/usr/local/lib
+CFLAGS += -std=c99 -g -Wall -Werror
+CPPFLAGS += -I$(ERL_EI_INCLUDE_DIR) -I/usr/local/include
+LDFLAGS += -L$(ERL_EI_LIBDIR) -L/usr/local/lib
 LDLIBS = -lpthread -lei -lm -lmagic
 PRIV = priv/
 RM = rm -Rf
