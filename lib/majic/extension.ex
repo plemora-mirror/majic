@@ -61,22 +61,27 @@ defmodule Majic.Extension do
     subtype? = Keyword.get(options, :subtype_as_extension, false)
     exts = MIME.extensions(mime_type) ++ subtype_extension(subtype?, mime_type)
     old_ext = String.downcase(Path.extname(name))
-    basename = Path.basename(name, old_ext)
-    "." <> old = old_ext
 
-    if old in exts do
-      Enum.join([basename, old])
+    unless old_ext == "" do
+      basename = Path.basename(name, old_ext)
+      "." <> old = old_ext
+
+      if old in exts do
+        Enum.join([basename, ".", old])
+      else
+        ext = List.first(exts)
+
+        ext_list =
+          cond do
+            ext && append? -> [old, ext]
+            !ext -> []
+            ext -> [ext]
+          end
+
+        Enum.join([basename] ++ ext_list, ".")
+      end
     else
-      ext = List.first(exts)
-
-      ext_list =
-        cond do
-          ext && append? -> [old, ext]
-          !ext -> []
-          ext -> [ext]
-        end
-
-      Enum.join([basename] ++ ext_list, ".")
+      name
     end
   end
 
