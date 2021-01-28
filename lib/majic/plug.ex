@@ -108,7 +108,6 @@ if Code.ensure_loaded?(Plug) do
     defp fix_upload(upload, magic, opts) do
       filename =
         if Keyword.get(opts, :fix_extension) do
-          IO.puts("FIXING EXTENSION #{inspect opts}")
           ext_opts = [
             append: Keyword.get(opts, :append, false),
             subtype_as_extension: Keyword.get(opts, :subtype_as_extension, false)
