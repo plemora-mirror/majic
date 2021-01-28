@@ -10,7 +10,7 @@ if Code.ensure_loaded?(Plug) do
     One of the required option of `pool`, `server` or `once` must be set.
 
     Additional options:
-    * `fix_extension`, default true: enable use of `Majic.Extension`,
+    * `fix_extension`, default false: enable use of `Majic.Extension`,
     * options for `Majic.Extension`.
 
     To use a majic pool:
@@ -43,7 +43,7 @@ if Code.ensure_loaded?(Plug) do
       end
 
       opts
-      |> Keyword.put_new(:fix_extension, true)
+      |> Keyword.put_new(:fix_extension, false)
       |> Keyword.put_new(:append, false)
       |> Keyword.put_new(:subtype_as_extension, false)
     end
